@@ -68,3 +68,98 @@ Exécution en root:
 ```sh
 ./reset-wordpress-default-theme.sh -p /var/www/html -r
 ```
+
+---
+
+# wp-security-audit
+
+Script POSIX `sh` d’audit sécurité WordPress orienté détection d’indicateurs de compromission et d’hygiène sécurité.
+
+## Objectif
+
+Le script `wp-security-audit.sh` génère un rapport texte horodaté avec:
+
+- scan approfondi de signatures backdoor/webshell et motifs d’obfuscation
+- vérification des `.htaccess` récents/suspects (et comparaison baseline si fournie)
+- détection de fichiers non désirés à la racine WordPress
+- contrôle des comptes administrateurs (volume, usernames suspects, derniers logins si métadonnées disponibles)
+- détection de mots de passe faibles via validation de hash WordPress
+- vérification des en-têtes HTTP de sécurité
+- détection de plugins/thèmes obsolètes ou potentiellement abandonnés
+- extraction d’indices de vulnérabilités connues via `wpscan` (si disponible)
+
+## Prérequis
+
+- Shell POSIX (`/bin/sh`)
+- Utilitaires système: `find`, `grep`, `awk`, `sort`, `cksum`, `curl`, `mktemp`
+- Optionnel mais recommandé:
+- `wp` (WP-CLI) pour les contrôles utilisateurs/plugins/thèmes/URL auto
+- `php` pour contrôle des hashes et datation API WordPress.org
+- `wpscan` pour enrichir la détection de vulnérabilités connues
+
+## Utilisation
+
+```sh
+./wp-security-audit.sh [options]
+```
+
+## Options
+
+- `-c <config_file>`: charge un fichier de configuration shell (surcharge les variables du script)
+- `-p <wp_path>`: chemin de l’installation WordPress cible
+- `-u <site_url>`: URL cible pour le contrôle des headers HTTP et WPScan
+- `-o <output_dir>`: dossier de sortie des rapports
+
+## Sorties
+
+Chaque exécution crée:
+
+- un rapport principal `wordpress_security_audit_<timestamp>.txt`
+- un journal technique `wordpress_security_audit_<timestamp>.detail.log`
+
+Le script affiche à la fin le chemin absolu/relatif du rapport principal.
+
+## Exemples
+
+Audit local d’une instance:
+
+```sh
+./wp-security-audit.sh -p /var/www/html -o ./security_audit_reports
+```
+
+Audit avec URL explicite:
+
+```sh
+./wp-security-audit.sh -p /var/www/html -u https://example.com -o ./security_audit_reports
+```
+
+Audit avec configuration dédiée:
+
+```sh
+./wp-security-audit.sh -c ./audit-security.conf -p /var/www/html
+```
+
+## Exemple de fichier de configuration
+
+```sh
+SITE_URL="https://example.com"
+OUTPUT_DIR="./security_audit_reports"
+HTTP_TIMEOUT_SECONDS="30"
+ENABLE_WPSCAN="1"
+WPSCAN_API_TOKEN=""
+HTACCESS_RECENT_DAYS="14"
+PLUGIN_ABANDON_DAYS="365"
+THEME_ABANDON_DAYS="365"
+ENABLE_WEAK_PASSWORD_SCAN="1"
+```
+
+## Lecture rapide du rapport
+
+- section `Scan backdoors et webshells`: nombre de matches de patterns malveillants et obfuscation
+- section `Verification des .htaccess`: fichiers récents/suspects + lignes détectées
+- section `Verification des utilisateurs administrateurs`: volume admins et usernames à risque
+- section `Scan des mots de passe faibles`: comptes validés contre la liste faible paramétrée
+- section `Verification des headers de securite HTTP`: headers présents/manquants
+- section `Plugins et themes abandonnes ou vulnerables`: mises à jour disponibles + abandon probable
+- section `Detection de vulnerabilites connues`: lignes WPScan contenant des indicateurs de vulnérabilité
+- section `Synthese`: vue consolidée des compteurs
