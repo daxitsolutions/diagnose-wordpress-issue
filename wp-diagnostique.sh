@@ -64,7 +64,29 @@ is_version() {
 version_lt() {
     local left="$1"
     local right="$2"
-    [[ "$left" != "$right" ]] && [[ "$(printf '%s\n' "$left" "$right" | sort -V | head -n1)" == "$left" ]]
+    local IFS=.
+    local i
+    local -a lv rv
+    local max_len
+    local lpart rpart
+
+    read -r -a lv <<< "$left"
+    read -r -a rv <<< "$right"
+
+    max_len=${#lv[@]}
+    if (( ${#rv[@]} > max_len )); then
+        max_len=${#rv[@]}
+    fi
+
+    for ((i = 0; i < max_len; i++)); do
+        lpart="${lv[i]:-0}"
+        rpart="${rv[i]:-0}"
+
+        ((10#$lpart < 10#$rpart)) && return 0
+        ((10#$lpart > 10#$rpart)) && return 1
+    done
+
+    return 1
 }
 
 contains_reco() {
@@ -191,7 +213,7 @@ check_compatibility() {
 
     for item in "$dir"/*/; do
         [[ -d "$item" ]] || continue
-        mainfile=$(find "$item" -maxdepth 1 -name "*.php" -exec grep -l "Plugin Name:\|Theme Name:" {} + | head -n1)
+        mainfile=$(find "$item" -maxdepth 1 -name "*.php" -exec grep -l "Plugin Name:\|Theme Name:" {} + 2>/dev/null | head -n1 || true)
         [[ -z "$mainfile" ]] && continue
 
         requires=$(grep -m1 "Requires at least:" "$mainfile" 2>/dev/null | awk -F: '{print $2}' | tr -d ' ' || echo "N/A")
